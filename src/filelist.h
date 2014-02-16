@@ -19,8 +19,6 @@ public:
 	FileList(QWidget* parent);
 	void setup(Domain* dm, Git* g);
 	void update(const RevFile* files, bool newFiles);
-	void addItem(const QString& label, const QColor& clr);
-	QString currentText();
 
 signals:
 	void contextMenu(const QString&, int);
@@ -39,6 +37,8 @@ private slots:
 	void on_customContextMenuRequested(const QPoint&);
 
 private:
+    void addItem(const QString& label, const QColor& clr);
+    QString currentText();
 	void insertFiles(const RevFile* files);
 
 	Domain* d;
