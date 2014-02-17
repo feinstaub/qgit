@@ -13,7 +13,7 @@
 #include "domain.h"
 #include "filelist.h"
 
-FileList::FileList(QWidget* p) : QListWidget(p), d(NULL), git(NULL), st(NULL) {}
+FileList::FileList(QWidget* p) : QTreeWidget(p), d(NULL), git(NULL), st(NULL) {}
 
 void FileList::setup(Domain* dm, Git* g) {
 
@@ -32,7 +32,7 @@ void FileList::setup(Domain* dm, Git* g) {
 
 void FileList::addItem(const QString& label, const QColor& clr) {
 
-	QListWidgetItem* item = new QListWidgetItem(label, this);
+	QTreeWidgetItem* item = new QTreeWidgetItem(label, this);
 	item->setForeground(clr);
 }
 
@@ -65,7 +65,7 @@ void FileList::focusInEvent(QFocusEvent*) {
 		on_currentItemChanged(currentItem(), currentItem());
 }
 
-void FileList::on_currentItemChanged(QListWidgetItem* current, QListWidgetItem*) {
+void FileList::on_currentItemChanged(QTreeWidgetItem* current, QTreeWidgetItem*) {
 
 	if (!current)
 		return;
@@ -152,7 +152,7 @@ void FileList::mouseMoveEvent(QMouseEvent* e) {
 	QListWidget::mouseMoveEvent(e);
 }
 
-void FileList::insertFiles(const RevFile* files) {
+void FileList::refreshFileList(const RevFile* files) {
 
 	clear();
 	if (!files)
@@ -219,7 +219,7 @@ void FileList::update(const RevFile* files, bool newFiles) {
 
 	setPalette(pl);
 	if (newFiles)
-		insertFiles(files);
+		refreshFileList(files);
 
 	QString fileName(currentText());
 	git->removeExtraFileInfo(&fileName); // could be a renamed/copied file

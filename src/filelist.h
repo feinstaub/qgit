@@ -6,14 +6,14 @@
 #ifndef FILELIST_H
 #define FILELIST_H
 
-#include <QListWidget>
+#include <QTreeWidget>
 #include "common.h"
 
 class Domain;
 class StateInfo;
 class Git;
 
-class FileList: public QListWidget {
+class FileList: public QTreeWidget {
 Q_OBJECT
 public:
 	FileList(QWidget* parent);
@@ -33,13 +33,17 @@ protected:
 	virtual void mouseReleaseEvent(QMouseEvent*);
 
 private slots:
-	void on_currentItemChanged(QListWidgetItem*, QListWidgetItem*);
+	void on_currentItemChanged(QTreeWidgetItem*, QTreeWidgetItem*);
 	void on_customContextMenuRequested(const QPoint&);
 
 private:
     void addItem(const QString& label, const QColor& clr);
     QString currentText();
-	void insertFiles(const RevFile* files);
+
+    /**
+     * clears file list contents and refills it with the given files
+     */
+	void refreshFileList(const RevFile* files);
 
 	Domain* d;
 	Git* git;
