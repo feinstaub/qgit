@@ -30,16 +30,20 @@ void FileList::setup(Domain* dm, Git* g) {
 	        this, SLOT(on_currentItemChanged(QListWidgetItem*, QListWidgetItem*)));
 }
 
+const int filenameColumnIndex = 1;
+
 void FileList::addItem(const QString& label, const QColor& clr) {
 
-	QTreeWidgetItem* item = new QTreeWidgetItem(label, this);
-	item->setForeground(clr);
+    QStringList labelList;
+    labelList << label;
+	QTreeWidgetItem* item = new QTreeWidgetItem(this, labelList);
+	item->setForeground(filenameColumnIndex, clr);
 }
 
 QString FileList::currentText() {
 
-	QListWidgetItem* item = currentItem();
-	return (item ? item->data(Qt::DisplayRole).toString() : "");
+	QTreeWidgetItem* item = currentItem();
+	return (item ? item->data(filenameColumnIndex, Qt::DisplayRole).toString() : "");
 }
 
 void FileList::on_changeFont(const QFont& f) {
@@ -61,8 +65,10 @@ void FileList::focusInEvent(QFocusEvent*) {
 	// Unluckily in case the clicked one is the first in list we
 	// have only one event and we could miss an update in that case,
 	// so try to handle that
-	if (!st->isMerge() && row(currentItem()) == 0)
-		on_currentItemChanged(currentItem(), currentItem());
+
+    // 2014-02-17: TODO: still an issue?
+    ////if (!st->isMerge() && row(currentItem()) == 0)
+	////	on_currentItemChanged(currentItem(), currentItem());
 }
 
 void FileList::on_currentItemChanged(QTreeWidgetItem* current, QTreeWidgetItem*) {
@@ -70,30 +76,33 @@ void FileList::on_currentItemChanged(QTreeWidgetItem* current, QTreeWidgetItem*)
 	if (!current)
 		return;
 
-	if (st->isMerge() && row(current) == 0) { // header clicked
-
-		// In a listbox without current item, as soon as the box
-		// gains focus the first item becomes the current item
-		// and a spurious currentChanged() signal is sent.
-		// In case of a merge the signal arrives here and fakes
-		// the user clicking on the header.
-		//
-		// The problem arise when user clicks on a merge header,
-		// then list box gains focus and current item becomes null
-		// because the content of the list is cleared and updated.
-		//
-		// If now tab is changed list box loose the focus and,
-		// upon changing back again the tab the signal triggers
-		// because Qt gives back the focus to the listbox.
-		//
-		// The workaround here is to give the focus away as soon
-		// as the user clicks on the merge header. Note that a
-		// lb->clearFocus() is not enough, we really need to
-		// reassign the focus to someone else.
-		d->tabPage()->setFocus();
-		st->setAllMergeFiles(!st->allMergeFiles());
-
-	} else {
+    // 2014-02-17: TODO: still an issue?
+// // 	if (st->isMerge() && row(current) == 0) { // header clicked
+// //
+// // 		// In a listbox without current item, as soon as the box
+// // 		// gains focus the first item becomes the current item
+// // 		// and a spurious currentChanged() signal is sent.
+// // 		// In case of a merge the signal arrives here and fakes
+// // 		// the user clicking on the header.
+// // 		//
+// // 		// The problem arise when user clicks on a merge header,
+// // 		// then list box gains focus and current item becomes null
+// // 		// because the content of the list is cleared and updated.
+// // 		//
+// // 		// If now tab is changed list box loose the focus and,
+// // 		// upon changing back again the tab the signal triggers
+// // 		// because Qt gives back the focus to the listbox.
+// // 		//
+// // 		// The workaround here is to give the focus away as soon
+// // 		// as the user clicks on the merge header. Note that a
+// // 		// lb->clearFocus() is not enough, we really need to
+// // 		// reassign the focus to someone else.
+// // 		d->tabPage()->setFocus();
+// // 		st->setAllMergeFiles(!st->allMergeFiles());
+// //
+// // 	}
+// // 	else
+    {
 		QString fileName(currentText());
 		git->removeExtraFileInfo(&fileName);
 		// if we are called by updateFileList() fileName is already updated
@@ -108,9 +117,10 @@ void FileList::on_currentItemChanged(QTreeWidgetItem* current, QTreeWidgetItem*)
 
 void FileList::on_customContextMenuRequested(const QPoint&) {
 
-	int row = currentRow();
-	if (row == -1 || (row == 0 && st->isMerge())) // header clicked
-		return;
+    // 2014-02-17: TODO: needed?
+// // 	int row = currentRow();
+// // 	if (row == -1 || (row == 0 && st->isMerge())) // header clicked
+// // 		return;
 
 	emit contextMenu(currentText(), QGit::POPUP_FILE_EV);
 }
@@ -121,13 +131,13 @@ void FileList::mousePressEvent(QMouseEvent* e) {
 		d->setReadyToDrag(true);
 		dragFileName = currentText();
 	}
-	QListWidget::mousePressEvent(e);
+	QTreeWidget::mousePressEvent(e);
 }
 
 void FileList::mouseReleaseEvent(QMouseEvent* e) {
 
 	d->setReadyToDrag(false); // in case of just click without moving
-	QListWidget::mouseReleaseEvent(e);
+	QTreeWidget::mouseReleaseEvent(e);
 }
 
 void FileList::mouseMoveEvent(QMouseEvent* e) {
@@ -149,7 +159,7 @@ void FileList::mouseMoveEvent(QMouseEvent* e) {
 
 		d->setDragging(false);
 	}
-	QListWidget::mouseMoveEvent(e);
+	QTreeWidget::mouseMoveEvent(e);
 }
 
 void FileList::refreshFileList(const RevFile* files) {
@@ -183,8 +193,8 @@ void FileList::refreshFileList(const RevFile* files) {
 		QColor clr = palette().color(QPalette::WindowText);
 		if (isMergeParents && files->mergeParent.at(i) != prevPar) {
 			prevPar = files->mergeParent.at(i);
-			new QListWidgetItem("", this);
-			new QListWidgetItem("", this);
+			new QTreeWidgetItem("", this);
+			new QTreeWidgetItem("", this);
 		}
 		QString extSt(files->extendedStatus(i));
 		if (extSt.isEmpty()) {
