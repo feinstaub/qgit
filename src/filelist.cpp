@@ -193,8 +193,8 @@ void FileList::refreshFileList(const RevFile* files) {
 		QColor clr = palette().color(QPalette::WindowText);
 		if (isMergeParents && files->mergeParent.at(i) != prevPar) {
 			prevPar = files->mergeParent.at(i);
-			new QTreeWidgetItem("", this);
-			new QTreeWidgetItem("", this);
+			new QTreeWidgetItem(this, QStringList(""));
+			new QTreeWidgetItem(this, QStringList(""));
 		}
 		QString extSt(files->extendedStatus(i));
 		if (extSt.isEmpty()) {
@@ -243,7 +243,7 @@ void FileList::update(const RevFile* files, bool newFiles) {
 	if (st->fileName().isEmpty())
 		return;
 
-	QList<QListWidgetItem*> l = findItems(st->fileName(), Qt::MatchExactly);
+	QList<QTreeWidgetItem*> l = findItems(st->fileName(), Qt::MatchExactly);
 	if (l.isEmpty()) { // could be a renamed/copied file, try harder
 
 		fileName = st->fileName();

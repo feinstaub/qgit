@@ -465,13 +465,13 @@ void MainImpl::histListView_doubleClicked(const QModelIndex& index) {
 		ActViewRev->activate(QAction::Trigger);
 }
 
-void MainImpl::fileList_itemDoubleClicked(QListWidgetItem* item) {
+void MainImpl::fileList_itemDoubleClicked(QTreeWidgetItem* item) {
 
-	bool isFirst = (item && item->listWidget()->item(0) == item);
+	bool isFirst = (item && item->treeWidget()->itemAt(1, 0) == item); // FIXME (1, 0) or (0, 0)? TODO: do not expose these internal details!
 	if (isFirst && rv->st.isMerge())
 		return;
 
-	bool isMainView = (item && item->listWidget() == rv->tab()->fileList);
+	bool isMainView = (item && item->treeWidget() == rv->tab()->fileList);
 	if (isMainView && ActViewDiff->isEnabled())
 		ActViewDiff->activate(QAction::Trigger);
 
