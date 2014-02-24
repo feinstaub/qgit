@@ -94,3 +94,5 @@ target_link_libraries(qgit ${Qt5Widgets_LIBRARIES})
 
 # notes:
 # http://stackoverflow.com/questions/15054117/aligning-qgraphicsitems-to-a-grid-when-dragging-and-dropping
+
+add_subdirectory(src/test)

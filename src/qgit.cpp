@@ -30,6 +30,13 @@ int main(int argc, char* argv[]) {
 
 	initMimePix();
 
+    bool doQuickTest = true; // for production this should be false
+
+    if (doQuickTest) {
+        // TODO: create window with several filelist.h/.cpp to test several configurations and code paths
+        return;
+    }
+
 	MainImpl* mainWin = new MainImpl;
 	mainWin->show();
 	QObject::connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
