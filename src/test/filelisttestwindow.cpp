@@ -12,27 +12,35 @@
 #include <QString>
 #include <QLabel>
 #include <QGroupBox>
+#include <QDebug>
+#include <QDir>
 
 #include "../filelist.h"
 #include "../domain.h"
 #include "../revsview.h"
+#include "../git.h"
 
-class FileListTestCase
-{
+class MainImpl;
+
+class FileListTestCase {
 public:
-    //FileList* fileList;
+    // title of the test case
     QString title;
-    QString testData; // TODO
+
+    // sha of qgit's own code
+    QString sha1;
+
+    // when given a diff between sha1 and sha2 is calculated
+    QString sha2;
 };
 
-class FileListTestDialogPrivate
-{
+class FileListTestDialogPrivate {
 public:
-    void createTestCases()
-    {
+    void createTestCases() {
         {
             FileListTestCase testCase;
-            testCase.title = "Test 1";
+            testCase.title = "Test 1 / simple / add, mod, remove";
+            testCase.sha1 = "0012ed7f7648b7bad794e8c58307cb2767c67fb8";
             testCaseList << testCase;
         }
 
@@ -66,20 +74,28 @@ public:
     QList<FileListTestCase> testCaseList;
 };
 
+class MockDomain : public Domain {
+public:
+    // with default ctor we would fail later
+    // isMain must be true otherwise FileHistory will not be inited
+    MockDomain(MainImpl* mi, Git* g) : Domain(mi, g, true) { };
 
-FileListTestDialog::FileListTestDialog() : d(new FileListTestDialogPrivate)
-{
+protected:
+    virtual bool doUpdate(bool force) {
+        qDebug() << QString("doUpdate: force=%1").arg(force);
+    }
+};
+
+FileListTestDialog::FileListTestDialog() : d(new FileListTestDialogPrivate) {
     d->createTestCases();
     createControls();
 }
 
-FileListTestDialog::~FileListTestDialog()
-{
+FileListTestDialog::~FileListTestDialog() {
     delete d;
 }
 
-void FileListTestDialog::createControls()
-{
+void FileListTestDialog::createControls() {
     this->setWindowTitle(QString("qgit FileList Test Dialog - Test case count: %1").arg(d->testCaseList.count()));
     this->setMinimumSize(500, 500);
 
@@ -93,8 +109,9 @@ void FileListTestDialog::createControls()
 
     int row = 0;
     int col = 0;
-    foreach(FileListTestCase testCase, d->testCaseList)
-    {
+    foreach(FileListTestCase testCase, d->testCaseList) {
+        qDebug() << QString("testCase: %1").arg(testCase.title);
+
         QGroupBox *groupBox = new QGroupBox(testCase.title);
         QVBoxLayout *vBox = new QVBoxLayout();
         groupBox->setLayout(vBox);
@@ -106,16 +123,32 @@ void FileListTestDialog::createControls()
         FileList *fileList = new FileList(this);
         //QScopedPointer<Domain> domain();
         // Domain* domain = new Domain(0, 0, false); // is abstract
-        Domain* domain = new RevsView(0, 0, false);
-        fileList->setup(domain, 0);
+
+        Git* git = new Git(this);
+        Domain* domain = new MockDomain(0, git); // 1. must be first
+
+        fileList->setup(domain, git);
+
+        {
+            QDir qgitSrcDir = QDir::current();
+            qgitSrcDir.cdUp();
+            QString qgitSrcPath = qgitSrcDir.absolutePath(); // assuming the build is done in a subfolder of the source tree
+            bool quit; // todo: why?
+            qDebug() << qgitSrcPath;
+            //git->stop(false);
+            Q_ASSERT(git->init(qgitSrcPath, false, 0, false, &quit)); // 2. must be next
+        }
+
+
         vBox->addWidget(fileList);
 
         mainLayout->addWidget(groupBox, row, col);
         col++;
-        if (col > 1) // two columns
-        {
+        if (col > 1) {// two columns
             col = 0;
             row++;
         }
+
+        delete domain; // needed?
     }
 }
