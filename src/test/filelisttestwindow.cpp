@@ -14,6 +14,8 @@
 #include <QGroupBox>
 
 #include "../filelist.h"
+#include "../domain.h"
+#include "../revsview.h"
 
 class FileListTestCase
 {
@@ -102,6 +104,10 @@ void FileListTestDialog::createControls()
         //vBox->addWidget(label);
 
         FileList *fileList = new FileList(this);
+        //QScopedPointer<Domain> domain();
+        // Domain* domain = new Domain(0, 0, false); // is abstract
+        Domain* domain = new RevsView(0, 0, false);
+        fileList->setup(domain, 0);
         vBox->addWidget(fileList);
 
         mainLayout->addWidget(groupBox, row, col);
