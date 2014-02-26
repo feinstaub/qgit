@@ -8,6 +8,8 @@
 #include "common.h"
 #include "mainimpl.h"
 
+#include "test/filelisttestwindow.h"
+
 #if defined(_MSC_VER) && defined(NDEBUG)
 	#pragma comment(linker,"/entry:mainCRTStartup")
 	#pragma comment(linker,"/subsystem:windows")
@@ -34,7 +36,9 @@ int main(int argc, char* argv[]) {
 
     if (doQuickTest) {
         // TODO: create window with several filelist.h/.cpp to test several configurations and code paths
-        return;
+        FileListTestDialog* fileListTestDialog = new FileListTestDialog();
+        fileListTestDialog->show();
+        return app.exec();
     }
 
 	MainImpl* mainWin = new MainImpl;

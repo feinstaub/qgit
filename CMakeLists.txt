@@ -59,6 +59,7 @@ set(CPP_SOURCES
     src/settingsimpl.cpp
     src/smartbrowse.cpp
     src/treeview.cpp
+    src/test/filelisttestwindow.cpp # TODO: move to separate cmake file
 )
 
 # UIS_HDRS will be used later in add_executable
