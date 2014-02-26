@@ -10,13 +10,16 @@
 #include <QVBoxLayout>
 #include <QGridLayout>
 #include <QString>
+#include <QLabel>
+#include <QGroupBox>
 
 #include "../filelist.h"
 
 class FileListTestCase
 {
 public:
-    FileList* fileList;
+    //FileList* fileList;
+    QString title;
     QString testData; // TODO
 };
 
@@ -27,17 +30,34 @@ public:
     {
         {
             FileListTestCase testCase;
-            testCase.fileList = 0;
-            testCase.testData = "Test 1";
+            testCase.title = "Test 1";
             testCaseList << testCase;
         }
 
         {
             FileListTestCase testCase;
-            testCase.fileList = 0;
-            testCase.testData = "Test 2";
+            testCase.title = "Test 2";
             testCaseList << testCase;
         }
+
+        {
+            FileListTestCase testCase;
+            testCase.title = "Test 3";
+            testCaseList << testCase;
+        }
+
+        {
+            FileListTestCase testCase;
+            testCase.title = "Test 4";
+            testCaseList << testCase;
+        }
+
+        {
+            FileListTestCase testCase;
+            testCase.title = "Test 5";
+            testCaseList << testCase;
+        }
+
     }
 
 public:
@@ -64,14 +84,32 @@ void FileListTestDialog::createControls()
     // taken from http://qt-project.org/doc/qt-4.8/layouts-basiclayouts.html
     //QVBoxLayout *mainLayout = new QVBoxLayout();
     QGridLayout *mainLayout = new QGridLayout();
+    //mainLayout->set
     setLayout(mainLayout);
 
     // TODO: Create array of FileList instance by example e. g. in ui_patchview.h (find usages)
 
+    int row = 0;
+    int col = 0;
     foreach(FileListTestCase testCase, d->testCaseList)
     {
-        QPushButton *pushButton = new QPushButton();
-        pushButton->setText(testCase.testData);
-        mainLayout->addWidget(pushButton);
+        QGroupBox *groupBox = new QGroupBox(testCase.title);
+        QVBoxLayout *vBox = new QVBoxLayout();
+        groupBox->setLayout(vBox);
+
+        //QLabel *label = new QLabel();
+        //label->setText(testCase.testData);
+        //vBox->addWidget(label);
+
+        FileList *fileList = new FileList(this);
+        vBox->addWidget(fileList);
+
+        mainLayout->addWidget(groupBox, row, col);
+        col++;
+        if (col > 1) // two columns
+        {
+            col = 0;
+            row++;
+        }
     }
 }
