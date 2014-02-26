@@ -27,9 +27,10 @@ public:
     // title of the test case
     QString title;
 
-    // sha of qgit's own code
-    QString sha1;
+    // a sha of qgit's own code
+    QString sha;
 
+    // another sha of qgit's own code
     // when given a diff between sha1 and sha2 is calculated
     QString sha2;
 };
@@ -40,7 +41,7 @@ public:
         {
             FileListTestCase testCase;
             testCase.title = "Test 1 / simple / add, mod, remove";
-            testCase.sha1 = "0012ed7f7648b7bad794e8c58307cb2767c67fb8";
+            testCase.sha = "0012ed7f7648b7bad794e8c58307cb2767c67fb8";
             testCaseList << testCase;
         }
 
@@ -139,16 +140,19 @@ void FileListTestDialog::createControls() {
             Q_ASSERT(git->init(qgitSrcPath, false, 0, false, &quit)); // 2. must be next
         }
 
+        const RevFile* revFiles = git->getFiles(testCase.sha, "", false); // why does this return nothing?
+        fileList->update(revFiles, true);
 
-        vBox->addWidget(fileList);
-
-        mainLayout->addWidget(groupBox, row, col);
-        col++;
-        if (col > 1) {// two columns
-            col = 0;
-            row++;
+        {
+            vBox->addWidget(fileList);
+            mainLayout->addWidget(groupBox, row, col);
+            col++;
+            if (col > 1) {// two columns
+                col = 0;
+                row++;
+            }
         }
 
-        delete domain; // needed?
+        // delete domain; // needed?
     }
 }
