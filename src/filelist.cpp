@@ -28,6 +28,7 @@ void FileList::setup(Domain* dm, Git* g) {
 
 	connect(this, SIGNAL(currentItemChanged(QListWidgetItem*, QListWidgetItem*)),
 	        this, SLOT(on_currentItemChanged(QListWidgetItem*, QListWidgetItem*)));
+    // TODO? QObject::connect: No such signal FileList::currentItemChanged(QListWidgetItem*, QListWidgetItem*) in /dev/src/qgit/src/filelist.cpp:29
 }
 
 const int filenameColumnIndex = 1;
