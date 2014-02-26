@@ -136,6 +136,7 @@ void FileList::mousePressEvent(QMouseEvent* e) {
 
 void FileList::mouseReleaseEvent(QMouseEvent* e) {
 
+    Q_ASSERT(d);
 	d->setReadyToDrag(false); // in case of just click without moving
 	QTreeWidget::mouseReleaseEvent(e);
 }
