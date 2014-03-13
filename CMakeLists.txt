@@ -1,18 +1,22 @@
 #
-# see http://www.kdab.com/using-cmake-with-qt-5/
-# see http://stackoverflow.com/questions/16245147/unable-to-include-a-ui-form-header-of-qt5-in-cmake
-# see http://www.qtcentre.org/wiki/index.php?title=Compiling_Qt4_apps_with_CMake
-#
-cmake_minimum_required(VERSION 2.8.8)
+# see http://qt-project.org/doc/qt-5/cmake-manual.html
 
-# Tell CMake to run moc when necessary:
-set(CMAKE_AUTOMOC ON)
+# see also http://www.kdab.com/using-cmake-with-qt-5/
+# see also http://stackoverflow.com/questions/16245147/unable-to-include-a-ui-form-header-of-qt5-in-cmake
+# see also http://www.qtcentre.org/wiki/index.php?title=Compiling_Qt4_apps_with_CMake
+#
+cmake_minimum_required(VERSION 2.8.11)
+
+project(qgit)
 
 # As moc files are generated in the binary dir, tell CMake
 # to always look for includes there:
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-# Widgets finds its own dependencies (QtGui and QtCore).
+# Instruct CMake to run moc automatically when needed.
+set(CMAKE_AUTOMOC ON)
+
+# Find the QtWidgets library; it will find its own dependencies (QtGui and QtCore).
 find_package(Qt5Widgets REQUIRED)
 
 include_directories(
@@ -73,12 +77,12 @@ SET(RESOURCE_FILES
 # in result SAMPLE_RC_SRCS variable will contain paths to files produced by rcc
 QT5_ADD_RESOURCES(RC_SRCS ${RESOURCE_FILES})
 
-
 add_executable(qgit ${CPP_SOURCES} ${UIS_HDRS} ${RC_SRCS})
 
-# Use Qt5 libs and includes (including CXX flags etc)
-# for the qgit executable
-qt5_use_modules(qgit Widgets)
+# Use the Widgets module from Qt 5 for the qgit executable
+## qt5_use_modules(qgit Widgets) # deprecated, see http://qt-project.org/doc/qt-5/cmake-manual.html
+target_link_libraries(qgit Qt5::Widgets) # The recommended way to use Qt libraries and headers with CMake 2.8.11 is to use the target_link_libraries command
+
 
 # kate: indent-width 4; replace-tabs on;
 
