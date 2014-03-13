@@ -52,6 +52,7 @@ set(CPP_SOURCES
     src/settingsimpl.cpp
     src/smartbrowse.cpp
     src/treeview.cpp
+    src/test/filelisttestwindow.cpp # TODO: move to separate cmake file
 )
 
 # UIS_HDRS will be used later in add_executable
@@ -88,3 +89,5 @@ target_link_libraries(qgit Qt5::Widgets) # The recommended way to use Qt librari
 
 # notes:
 # http://stackoverflow.com/questions/15054117/aligning-qgraphicsitems-to-a-grid-when-dragging-and-dropping
+
+add_subdirectory(src/test)

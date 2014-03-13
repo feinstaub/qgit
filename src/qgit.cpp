@@ -8,6 +8,8 @@
 #include "common.h"
 #include "mainimpl.h"
 
+#include "test/filelisttestwindow.h"
+
 #if defined(_MSC_VER) && defined(NDEBUG)
 	#pragma comment(linker,"/entry:mainCRTStartup")
 	#pragma comment(linker,"/subsystem:windows")
@@ -29,6 +31,15 @@ int main(int argc, char* argv[]) {
 	GIT_DIR = set.value(GIT_DIR_KEY).toString();
 
 	initMimePix();
+
+    bool doQuickTest = true; // for production this should be false
+
+    if (doQuickTest) {
+        // TODO: create window with several filelist.h/.cpp to test several configurations and code paths
+        FileListTestDialog* fileListTestDialog = new FileListTestDialog();
+        fileListTestDialog->show();
+        return app.exec();
+    }
 
 	MainImpl* mainWin = new MainImpl;
 	mainWin->show();
