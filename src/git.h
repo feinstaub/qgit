@@ -83,6 +83,7 @@ public:
 	bool isTextHighlighter() const { return isTextHighlighterFound; }
 	const QString textHighlighterVersion() const { return textHighlighterVersionFound; }
 	bool isMainHistory(const FileHistory* fh) { return (fh == revData); }
+	bool isContiguous(const QStringList &revs);
 	MyProcess* getDiff(SCRef sha, QObject* receiver, SCRef diffToSha, bool combined);
 	const QString getWorkDirDiff(SCRef fileName = "");
 	MyProcess* getFile(SCRef fileSha, QObject* receiver, QByteArray* result, SCRef fileName);
@@ -94,6 +95,7 @@ public:
 	const RevFile* getFiles(SCRef sha, SCRef sha2 = "", bool all = false, SCRef path = "");
 	bool getTree(SCRef ts, TreeInfo& ti, bool wd, SCRef treePath);
 	static const QString getLocalDate(SCRef gitDate);
+	const QString getCurrentBranchName() const {return curBranchName;}
 	const QString getDesc(SCRef sha, QRegExp& slogRE, QRegExp& lLogRE, bool showH, FileHistory* fh);
 	const QString getLastCommitMsg();
 	const QString getNewCommitMsg();
@@ -109,7 +111,7 @@ public:
 	uint checkRef(SCRef sha, uint mask = ANY_REF) const;
 	const QString getRevInfo(SCRef sha);
 	const QString getRefSha(SCRef refName, RefType type = ANY_REF, bool askGit = true);
-	const QStringList getRefName(SCRef sha, RefType type, QString* curBranch = NULL) const;
+	const QStringList getRefNames(SCRef sha, uint mask = ANY_REF) const;
 	const QStringList getAllRefNames(uint mask, bool onlyLoaded);
 	const QStringList getAllRefSha(uint mask);
 	const QStringList sortShaListByIndex(SCList shaList);
@@ -118,11 +120,9 @@ public:
 	bool formatPatch(SCList shaList, SCRef dirPath, SCRef remoteDir = "");
 	bool updateIndex(SCList selFiles);
 	bool commitFiles(SCList files, SCRef msg, bool amend);
-	bool makeBranch(SCRef sha, SCRef branchName);
-	bool makeTag(SCRef sha, SCRef tag, SCRef msg);
-	bool deleteTag(SCRef sha);
 	bool applyPatchFile(SCRef patchPath, bool fold, bool sign);
 	bool resetCommits(int parentDepth);
+	bool merge(SCRef into, SCList sources, QString* error=NULL);
 	bool stgCommit(SCList selFiles, SCRef msg, SCRef patchName, bool fold);
 	bool stgPush(SCRef sha);
 	bool stgPop(SCRef sha);
@@ -170,7 +170,6 @@ private:
                 uint type;
                 QStringList branches;
                 QStringList remoteBranches;
-                QString     currentBranch;
                 QStringList tags;
                 QStringList refs;
                 QString     tagObj; // TODO support more then one obj
@@ -265,6 +264,7 @@ private:
 	QString gitDir;
 	QString filesLoadingPending;
 	QString filesLoadingCurSha;
+	QString curBranchName;
 	int filesLoadingStartOfs;
 	bool cacheNeedsUpdate;
 	bool errorReportingEnabled;

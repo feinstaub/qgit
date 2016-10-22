@@ -28,6 +28,8 @@
 
 #define SHOW_MSG(x) QApplication::postEvent(parent(), new MessageEvent(x)); EM_PROCESS_EVENTS_NO_INPUT;
 
+#define GIT_LOG_FORMAT "%m%HX%PX%n%cn<%ce>%n%an<%ae>%n%at%n%s%n"
+
 // Used on init() for reading parameters once;
 // It's OK to be unique among qgit windows.
 static bool startup = true;
@@ -145,7 +147,7 @@ const QStringList Git::getGitConfigList(bool global) {
 bool Git::isImageFile(SCRef file) {
 
 	const QString ext(file.section('.', -1).toLower());
-	return QImageReader::supportedImageFormats().contains(ext.toAscii());
+	return QImageReader::supportedImageFormats().contains(ext.toLatin1());
 }
 
 //CT TODO investigate if there is a better way of getting this (from git e.g.)
@@ -181,7 +183,6 @@ bool Git::isThrowOnStopRaised(int excpId, SCRef curContext) {
 
 void Git::setTextCodec(QTextCodec* tc) {
 
-	QTextCodec::setCodecForCStrings(tc); // works also with tc == 0 (Latin1)
 	QTextCodec::setCodecForLocale(tc);
 	QString name(tc ? tc->name() : "Latin1");
 
@@ -190,7 +191,9 @@ void Git::setTextCodec(QTextCodec* tc) {
 	if (name == "Big5-HKSCS")
 		name = "Big5";
 
-   run("git config i18n.commitencoding " + name);
+	bool dummy;
+	if (tc != getTextCodec(&dummy))
+		run("git config i18n.commitencoding " + name);
 }
 
 QTextCodec* Git::getTextCodec(bool* isGitArchive) {
@@ -200,7 +203,7 @@ QTextCodec* Git::getTextCodec(bool* isGitArchive) {
 		return NULL;
 
 	QString runOutput;
-   if (!run("git config i18n.commitencoding", &runOutput))
+	if (!run("git config i18n.commitencoding", &runOutput))
 		return NULL;
 
 	if (runOutput.isEmpty()) // git docs says default is utf-8
@@ -235,32 +238,30 @@ uint Git::checkRef(SCRef sha, uint mask) const {
 	return (it != refsShaMap.constEnd() ? (*it).type & mask : 0);
 }
 
-const QStringList Git::getRefName(SCRef sha, RefType type, QString* curBranch) const {
+const QStringList Git::getRefNames(SCRef sha, uint mask) const {
 
-	if (!checkRef(sha, type))
-		return QStringList();
+	QStringList result;
+	if (!checkRef(sha, mask))
+		return result;
 
 	const Reference& rf = refsShaMap[toTempSha(sha)];
 
-	if (curBranch)
-		*curBranch = rf.currentBranch;
+	if (mask & TAG)
+		result << rf.tags;
 
-	if (type == TAG)
-		return rf.tags;
+	if (mask & BRANCH)
+		result << rf.branches;
 
-	else if (type == BRANCH)
-		return rf.branches;
+	if (mask & RMT_BRANCH)
+		result << rf.remoteBranches;
 
-	else if (type == RMT_BRANCH)
-		return rf.remoteBranches;
+	if (mask & REF)
+		result << rf.refs;
 
-	else if (type == REF)
-		return rf.refs;
+	if (mask == APPLIED || mask == UN_APPLIED)
+		result << QStringList(rf.stgitPatch);
 
-	else if (type == APPLIED || type == UN_APPLIED)
-		return QStringList(rf.stgitPatch);
-
-	return QStringList();
+	return result;
 }
 
 const QStringList Git::getAllRefSha(uint mask) {
@@ -362,22 +363,22 @@ const QString Git::getRevInfo(SCRef sha) {
 	QString refsInfo;
 	if (type & BRANCH) {
 		const QString cap(type & CUR_BRANCH ? "HEAD: " : "Branch: ");
-		refsInfo =  cap + getRefName(sha, BRANCH).join(" ");
+		refsInfo =  cap + getRefNames(sha, BRANCH).join(" ");
 	}
 	if (type & RMT_BRANCH)
-		refsInfo.append("   Remote branch: " + getRefName(sha, RMT_BRANCH).join(" "));
+		refsInfo.append("   Remote branch: " + getRefNames(sha, RMT_BRANCH).join(" "));
 
 	if (type & TAG)
-		refsInfo.append("   Tag: " + getRefName(sha, TAG).join(" "));
+		refsInfo.append("   Tag: " + getRefNames(sha, TAG).join(" "));
 
 	if (type & REF)
-		refsInfo.append("   Ref: " + getRefName(sha, REF).join(" "));
+		refsInfo.append("   Ref: " + getRefNames(sha, REF).join(" "));
 
 	if (type & APPLIED)
-		refsInfo.append("   Patch: " + getRefName(sha, APPLIED).join(" "));
+		refsInfo.append("   Patch: " + getRefNames(sha, APPLIED).join(" "));
 
 	if (type & UN_APPLIED)
-		refsInfo.append("   Patch: " + getRefName(sha, UN_APPLIED).join(" "));
+		refsInfo.append("   Patch: " + getRefNames(sha, UN_APPLIED).join(" "));
 
 	if (type & TAG) {
 		SCRef msg(getTagMsg(sha));
@@ -858,6 +859,16 @@ bool Git::isParentOf(SCRef par, SCRef child) {
 	return (c && c->parentsCount() == 1 && QString(c->parent(0)) == par); // no merges
 }
 
+bool Git::isContiguous(const QStringList &revs)
+{
+	if (revs.count() == 1) return true;
+	for (QStringList::const_iterator it=revs.begin(), end=revs.end()-1; it!=end; ++it) {
+		const Rev* c = revLookup(*it);
+		if (!c->parents().contains(*(it+1))) return false;
+	}
+	return true;
+}
+
 bool Git::isSameFiles(SCRef tree1Sha, SCRef tree2Sha) {
 
 	// early skip common case of browsing with up and down arrows, i.e.
@@ -963,18 +974,27 @@ const QString Git::getNewCommitMsg() {
 		dbs("ASSERT: getNewCommitMsg zero_sha not found");
 		return "";
 	}
-
 	QString status = c->longLog();
-	status.prepend('\n').replace(QRegExp("\\n([^#])"), "\n#\\1"); // comment all the lines
+	status.prepend('\n').replace(QRegExp("\\n([^#\\n]?)"), "\n#\\1"); // comment all the lines
+
+	if (isMergeHead) {
+		QFile file(QDir(gitDir).absoluteFilePath("MERGE_MSG"));
+		if (file.open(QIODevice::ReadOnly)) {
+			QTextStream in(&file);
+
+			while(!in.atEnd())
+				status.prepend(in.readLine());
+
+			file.close();
+		}
+	}
 	return status;
 }
 
 //CT TODO utility function; can go elsewhere
 const QString Git::colorMatch(SCRef txt, QRegExp& regExp) {
 
-	QString text;
-
-	text = Qt::escape(txt);
+	QString text = qt4and5escaping(txt);
 
 	if (regExp.isEmpty())
 		return text;
@@ -1036,15 +1056,16 @@ const QString Git::getDesc(SCRef sha, QRegExp& shortLogRE, QRegExp& longLogRE,
 			<< "</span></th></tr>";
 
 		if (showHeader) {
-		    if (c->committer() != c->author())
-		        ts << formatList(QStringList(Qt::escape(c->committer())), "Committer");
-			ts << formatList(QStringList(Qt::escape(c->author())), "Author");
+			if (c->committer() != c->author())
+				ts << formatList(QStringList(qt4and5escaping(c->committer())), "Committer");
+
+			ts << formatList(QStringList(qt4and5escaping(c->author())), "Author");
 			ts << formatList(QStringList(getLocalDate(c->authorDate())), " Author date");
 
 			if (c->isUnApplied || c->isApplied) {
 
-				QStringList patches(getRefName(sha, APPLIED));
-				patches += getRefName(sha, UN_APPLIED);
+				QStringList patches(getRefNames(sha, APPLIED));
+				patches += getRefNames(sha, UN_APPLIED);
 				ts << formatList(patches, "Patch");
 			} else {
 				ts << formatList(c->parents(), "Parent", false);
@@ -1083,8 +1104,7 @@ const QString Git::getDesc(SCRef sha, QRegExp& shortLogRE, QRegExp& longLogRE,
 			if (slog.length() > 60)
 				slog = slog.left(57).trimmed().append("...");
 
-			slog = Qt::escape(slog);
-			const QString link("<a href=\"" + r->sha() + "\">" + slog + "</a>");
+			const QString link("<a href=\"" + r->sha() + "\">" + qt4and5escaping(slog) + "</a>");
 			text.replace(pos + 2, ref.length(), link);
 			pos += link.length();
 		} else
@@ -1298,6 +1318,23 @@ bool Git::resetCommits(int parentDepth) {
 	return run(runCmd);
 }
 
+bool Git::merge(SCRef into, SCList sources, QString *error)
+{
+	if (error) *error = "";
+	if (!run(QString("git checkout -q %1").arg(into)))
+		return false; // failed to checkout
+
+	QString cmd = QString("git merge -q --no-commit ") + sources.join(" ");
+	MyProcess p(parent(), this, workDir, false);
+	p.runSync(cmd, NULL, NULL, "");
+
+	const QString& e = p.getErrorOutput();
+	if (e.contains("stopped before committing as requested"))
+		return true;
+	if (error) *error = e;
+	return false;
+}
+
 bool Git::applyPatchFile(SCRef patchPath, bool fold, bool isDragDrop) {
 
 	if (isStGIT) {
@@ -1309,7 +1346,7 @@ bool Git::applyPatchFile(SCRef patchPath, bool fold, bool isDragDrop) {
 		} else
 			return run("stg import --mail " + quote(patchPath));
 	}
-	QString runCmd("git am --utf8 --3way ");
+	QString runCmd("git am ");
 
 	QSettings settings;
 	const QString APOpt(settings.value(AM_P_OPT_KEY).toString());
@@ -1562,31 +1599,9 @@ exit:
 	return ret;
 }
 
-bool Git::makeBranch(SCRef sha, SCRef branchName) {
-
-	return run("git branch " + branchName + " " + sha);
-}
-
-bool Git::makeTag(SCRef sha, SCRef tagName, SCRef msg) {
-
-	if (msg.isEmpty())
-		return run("git tag " + tagName + " " + sha);
-
-	return run("git tag -m \"" + msg + "\" " + tagName + " " + sha);
-}
-
-bool Git::deleteTag(SCRef sha) {
-
-	const QStringList tags(getRefName(sha, TAG));
-	if (!tags.empty())
-		return run("git tag -d " + tags.first()); // only one
-
-	return false;
-}
-
 bool Git::stgPush(SCRef sha) {
 
-	const QStringList patch(getRefName(sha, UN_APPLIED));
+	const QStringList patch(getRefNames(sha, UN_APPLIED));
 	if (patch.count() != 1) {
 		dbp("ASSERT in Git::stgPush, found %1 patches instead of 1", patch.count());
 		return false;
@@ -1596,7 +1611,7 @@ bool Git::stgPush(SCRef sha) {
 
 bool Git::stgPop(SCRef sha) {
 
-	const QStringList patch(getRefName(sha, APPLIED));
+	const QStringList patch(getRefNames(sha, APPLIED));
 	if (patch.count() != 1) {
 		dbp("ASSERT in Git::stgPop, found %1 patches instead of 1", patch.count());
 		return false;
@@ -1635,23 +1650,30 @@ const QString Git::getLocalDate(SCRef gitDate) {
 const QStringList Git::getArgs(bool* quit, bool repoChanged) {
 
         QString args;
+        QStringList arglist = qApp->arguments();
+
+        // Remove first argument which is the path of the current executable
+        arglist.removeFirst();
+
         if (startup) {
-                for (int i = 1; i < qApp->argc(); i++) {
+                foreach (QString arg, arglist) {
                         // in arguments with spaces double quotes
                         // are stripped by Qt, so re-add them
-                        QString arg(qApp->argv()[i]);
                         if (arg.contains(' '))
                                 arg.prepend('\"').append('\"');
 
                         args.append(arg + ' ');
                 }
         }
-        if (testFlag(RANGE_SELECT_F) && (!startup || args.isEmpty())) {
-
-                RangeSelectImpl rs((QWidget*)parent(), &args, repoChanged, this);
-                *quit = (rs.exec() == QDialog::Rejected); // modal execution
-                if (*quit)
-                        return QStringList();
+        if (!startup || args.isEmpty()) { // need to retrieve args
+                if (testFlag(RANGE_SELECT_F)) { // open range dialog
+                        RangeSelectImpl rs((QWidget*)parent(), &args, repoChanged, this);
+                        *quit = (rs.exec() == QDialog::Rejected); // modal execution
+                        if (*quit)
+                            return QStringList();
+                } else {
+                    args = RangeSelectImpl::getDefaultArgs();
+                }
         }
         startup = false;
         return MyProcess::splitArgList(args);
@@ -1732,7 +1754,7 @@ bool Git::getRefs() {
 
         // check for a merge and read current branch sha
         isMergeHead = d.exists("MERGE_HEAD");
-        QString curBranchSHA, curBranchName;
+        QString curBranchSHA;
         if (!run("git rev-parse --revs-only HEAD", &curBranchSHA))
                 return false;
 
@@ -1742,6 +1764,8 @@ bool Git::getRefs() {
         curBranchSHA = curBranchSHA.trimmed();
         curBranchName = curBranchName.prepend('\n').section("\n*", 1);
         curBranchName = curBranchName.section('\n', 0, 0).trimmed();
+        if (curBranchName.contains(" detached "))
+            curBranchName = "";
 
         // read refs, normally unsorted
         QString runOutput;
@@ -1801,10 +1825,8 @@ bool Git::getRefs() {
 
                         cur->branches.append(refName.mid(11));
                         cur->type |= BRANCH;
-                        if (curBranchSHA == revSha) {
+                        if (curBranchSHA == revSha)
                                 cur->type |= CUR_BRANCH;
-                                cur->currentBranch = curBranchName;
-                        }
                 } else if (refName.startsWith("refs/remotes/") && !refName.endsWith("HEAD")) {
 
                         cur->remoteBranches.append(refName.mid(13));
@@ -1819,6 +1841,10 @@ bool Git::getRefs() {
         }
         if (isStGIT && !patchNames.isEmpty())
                 parseStGitPatches(patchNames, patchShas);
+
+        // mark current head (even when detached)
+        Reference* cur = lookupOrAddReference(toPersistentSha(curBranchSHA, shaBackupBuf));
+        cur->type |= CUR_BRANCH;
 
         return !refsShaMap.empty();
 }
@@ -1882,12 +1908,17 @@ Rev* Git::fakeRevData(SCRef sha, SCList parents, SCRef author, SCRef date, SCRef
         data.append(author + '\n' + author + '\n' + date + '\n');
         data.append(log + '\n' + longLog);
 
-        QString header("log size " + QString::number(data.size() - 1) + '\n');
+        QString header("log size " + QString::number(QByteArray(data.toLatin1()).length() - 1) + '\n');
         data.prepend(header);
         if (!patch.isEmpty())
                 data.append('\n' + patch);
 
-        QByteArray* ba = new QByteArray(data.toAscii());
+#if QT_VERSION >= 0x050000
+        QTextCodec* tc = QTextCodec::codecForLocale();
+        QByteArray* ba = new QByteArray(tc->fromUnicode(data));
+#else
+        QByteArray* ba = new QByteArray(data.toLatin1());
+#endif
         ba->append('\0');
 
         fh->rowData.append(ba);
@@ -2111,7 +2142,7 @@ bool Git::startRevList(SCList args, FileHistory* fh) {
                         "--log-size " // FIXME broken on Windows
 #endif
                         "--parents --boundary -z "
-                        "--pretty=format:%m%HX%PX%n%cn<%ce>%n%an<%ae>%n%at%n%s%n");
+                        "--pretty=format:" GIT_LOG_FORMAT);
 
         // we don't need log message body for file history
         if (isMainHistory(fh))
@@ -2146,7 +2177,7 @@ bool Git::startUnappliedList() {
 #ifndef Q_OS_WIN32
                     "--log-size " // FIXME broken on Windows
 #endif
-                    "--pretty=format:%m%HX%PX%n%an<%ae>%n%at%n%s%n%b ^HEAD");
+                    "--pretty=format:" GIT_LOG_FORMAT "%b ^HEAD");
 
         QStringList sl(cmd.split(' '));
         sl << unAppliedShaList;
@@ -2248,7 +2279,7 @@ bool Git::init(SCRef wd, bool askForRange, const QStringList* passedArgs, bool o
 
                         // update text codec according to repo settings
                         bool dummy;
-                        QTextCodec::setCodecForCStrings(getTextCodec(&dummy));
+                        QTextCodec::setCodecForLocale(getTextCodec(&dummy));
 
                         // load references
                         SHOW_MSG(msg1 + "refs...");
@@ -2770,10 +2801,12 @@ void Git::procFinished() {
 
 void Git::procReadyRead(const QByteArray& fileChunk) {
 
+        QTextCodec* tc = QTextCodec::codecForLocale();
+
         if (filesLoadingPending.isEmpty())
-                filesLoadingPending = fileChunk;
+                filesLoadingPending = tc->toUnicode(fileChunk);
         else
-                filesLoadingPending.append(fileChunk); // add to previous half lines
+                filesLoadingPending.append(tc->toUnicode(fileChunk)); // add to previous half lines
 
         RevFile* rf = NULL;
         if (!filesLoadingCurSha.isEmpty() && revsFiles.contains(toTempSha(filesLoadingCurSha)))

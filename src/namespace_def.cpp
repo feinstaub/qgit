@@ -20,6 +20,7 @@
 #include <QTemporaryFile>
 #include <QTextStream>
 #include <QWidget>
+#include <QTextCodec>
 #include "common.h"
 #include "git.h"
 #include "annotate.h"
@@ -153,7 +154,7 @@ const QString QGit::PATCHES_NAME = "qgit_import";
 
 // git index parameters
 const QString QGit::ZERO_SHA        = "0000000000000000000000000000000000000000";
-const QString QGit::CUSTOM_SHA      = "CUSTOM";
+const QString QGit::CUSTOM_SHA      = "*** CUSTOM * CUSTOM * CUSTOM * CUSTOM **";
 const QString QGit::ALL_MERGE_FILES = "ALL_MERGE_FILES";
 
 const QByteArray QGit::ZERO_SHA_BA(QGit::ZERO_SHA.toLatin1());
@@ -164,6 +165,7 @@ const QString QGit::ORG_KEY         = "qgit";
 const QString QGit::APP_KEY         = "qgit4";
 const QString QGit::GIT_DIR_KEY     = "msysgit_exec_dir";
 const QString QGit::EXT_DIFF_KEY    = "external_diff_viewer";
+const QString QGit::EXT_EDITOR_KEY  = "external_editor";
 const QString QGit::REC_REP_KEY     = "recent_open_repos";
 const QString QGit::STD_FNT_KEY     = "standard_font";
 const QString QGit::TYPWRT_FNT_KEY  = "typewriter_font";
@@ -193,6 +195,7 @@ const QString QGit::CMT_TEMPL_DEF   = ".git/commit-template";
 const QString QGit::EX_DEF          = ".git/info/exclude";
 const QString QGit::EX_PER_DIR_DEF  = ".gitignore";
 const QString QGit::EXT_DIFF_DEF    = "kompare";
+const QString QGit::EXT_EDITOR_DEF  = "emacs";
 
 // cache file
 const QString QGit::BAK_EXT          = ".bak";
@@ -367,12 +370,16 @@ void QGit::restoreGeometrySetting(SCRef name, QWidget* w, splitVect* svPtr) {
 // misc helpers
 bool QGit::stripPartialParaghraps(const QByteArray& ba, QString* dst, QString* prev) {
 
+    QTextCodec* tc = QTextCodec::codecForLocale();
+
 	if (ba.endsWith('\n')) { // optimize common case
-		*dst = ba;
+        *dst = tc->toUnicode(ba);
 
 		// handle rare case of a '\0' inside content
-		while (dst->size() < ba.size() && ba.at(dst->size()) == '\0')
-			dst->append(" ").append(ba.mid(dst->size() + 1)); // sizes should match
+        while (dst->size() < ba.size() && ba.at(dst->size()) == '\0') {
+            QString s = tc->toUnicode(ba.mid(dst->size() + 1)); // sizes should match
+            dst->append(" ").append(s);
+        }
 
 		dst->truncate(dst->size() - 1); // strip trailing '\n'
 		if (!prev->isEmpty()) {
@@ -381,10 +388,12 @@ bool QGit::stripPartialParaghraps(const QByteArray& ba, QString* dst, QString* p
 		}
 		return true;
 	}
-	QString src(ba);
+    QString src = tc->toUnicode(ba);
 	// handle rare case of a '\0' inside content
-	while (src.size() < ba.size() && ba.at(src.size()) == '\0')
-		src.append(" ").append(ba.mid(src.size() + 1));
+    while (src.size() < ba.size() && ba.at(src.size()) == '\0') {
+        QString s = tc->toUnicode(ba.mid(src.size() + 1));
+        src.append(" ").append(s);
+    }
 
 	int idx = src.lastIndexOf('\n');
 	if (idx == -1) {

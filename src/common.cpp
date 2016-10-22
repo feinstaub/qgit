@@ -7,13 +7,15 @@
 
 */
 
+#include <QDataStream>
+#include <QTextDocument>
 #include "common.h"
 
 const QString Rev::mid(int start, int len) const {
 
         // warning no sanity check is done on arguments
         const char* data = ba.constData();
-        return QString::fromAscii(data + start, len);
+        return QString::fromLocal8Bit(data + start, len);
 }
 
 const QString Rev::midSha(int start, int len) const {
@@ -125,13 +127,9 @@ int Rev::indexData(bool quick, bool withDiff) const {
     if (withDiff || !logSize) {
 
         revEnd = (logEnd > idx) ? logEnd - 1: idx;
-        do { // search for "\n\0" to handle (rare) cases of '\0'
-            // in content, see c42012 and bb8d8a6 in Linux tree
-            revEnd = ba.indexOf('\0', revEnd + 1);
-            if (revEnd == -1)
-                return -1;
-
-        } while (data[revEnd - 1] != '\n');
+        revEnd = ba.indexOf('\0', revEnd + 1);
+        if (revEnd == -1)
+            return -1;
 
     } else
         revEnd = logEnd;
@@ -266,3 +264,10 @@ RevFile& RevFile::operator<<(QDataStream& stream) {
         return *this;
 }
 
+QString qt4and5escaping(QString toescape) {
+#if QT_VERSION >= 0x050000
+	return toescape.toHtmlEscaped();
+#else
+	return Qt::escape(toescape);
+#endif
+}
